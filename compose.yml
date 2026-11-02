@@ -1,13 +1,14 @@
+
 services:
   socket-proxy:
     container_name: socket-proxy
     image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
     restart: unless-stopped
     environment:
-      CONTAINERS: 1
-      NETWORKS: 1
-      INFO: 1
-      POST: 0
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      INFO: "1"
+      POST: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     logging:
@@ -31,42 +32,50 @@ services:
     env_file:
       - .env
     command:
+      # Docker provider
       - --providers.docker=true
       - --providers.docker.endpoint=tcp://socket-proxy:2375
       - --providers.docker.exposedbydefault=false
       - --providers.docker.network=proxy
+
+      # Entrypoints
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      # Enable the following line to use the default Traefik dashboard
+
+      # Dashboard
       - --api.dashboard=true
-      - traefik.enable=true
-       # Dashboard
-      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAME}`)
-      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
-      - traefik.http.routers.traefik-dashboard.service=api@internal
 
-      # TLS
-      - traefik.http.routers.traefik-dashboard.tls=true
-      - traefik.http.routers.traefik-dashboard.tls.certresolver=cloudflare
-
-
-      # Enable the following lines to use Let's Encrypt with Cloudflare DNS challenge
+      # Let's Encrypt + Cloudflare DNS challenge
       - --certificatesresolvers.cf.acme.email=${TRAEFIK_ACME_EMAIL}
       - --certificatesresolvers.cf.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
       - --certificatesresolvers.cf.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+
     volumes:
       - ./letsencrypt/acme.json:/letsencrypt/acme.json:rw
+
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
     networks:
       - proxy
       - docker-api
+
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+
+      # Dashboard
+      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAME}`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.tls=true
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=cf
 
 networks:
   proxy:
